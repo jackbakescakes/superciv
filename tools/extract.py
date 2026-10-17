@@ -37,9 +37,15 @@ def extract(path, maxy=None, min_area=1500):
         crop = a[sl].copy()
         m = fg[sl] & (lab[sl] == i + 1)
         crop[..., 3] = np.where(m, 255, 0)
-        out.append((sl[1].start, crop))
+        out.append(((sl[0].start + sl[0].stop) / 2, sl[1].start, crop))
+    # reading order: rows top to bottom (a new row when the centre drops by > 40% of a sprite), then left to right
     out.sort(key=lambda t: t[0])
-    return [c for _, c in out]
+    rows, cur = [], []
+    for o in out:
+        if cur and o[0] - cur[-1][0] > 0.4 * o[2].shape[0]: rows.append(cur); cur = []
+        cur.append(o)
+    if cur: rows.append(cur)
+    return [o[2] for r in rows for o in sorted(r, key=lambda t: t[1])]
 
 if __name__ == '__main__':
     maxy = int(sys.argv[3]) if len(sys.argv) > 3 else None

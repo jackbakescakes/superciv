@@ -1075,7 +1075,8 @@ for (let e = 1; e <= 4; e++) {
   ATLAS['hero' + e] = { ...ATLAS.hero, cw: 50, ax: 25, src: `assets/hero${e}.png` };
   ATLAS['raider' + e] = { ...ATLAS.raider, src: `assets/raider${e}.png` };
 }
-for (const k in ATLAS) { const a = ATLAS[k]; a.img = new Image(); a.img.onload = () => { a.ok = true; }; a.img.src = a.src; }
+// cell width comes from the sheet itself, so redrawn 64px era sheets and older 50px ones both work
+for (const k in ATLAS) { const a = ATLAS[k]; a.img = new Image(); a.img.onload = () => { const n = Object.keys(a.f).length; if (a.img.width % n === 0) { a.cw = a.img.width / n; a.ax = a.cw / 2; } a.ok = true; }; a.img.src = a.src; }
 const TILE_M = {"grass":{"x":0,"w":32,"h":32},"earth":{"x":32,"w":32,"h":32},"plank":{"x":64,"w":32,"h":18},"canopy":{"x":96,"w":32,"h":32},"trunk":{"x":128,"w":32,"h":32},"bridge":{"x":160,"w":32,"h":42},"stone":{"x":192,"w":32,"h":32},"battlement":{"x":224,"w":32,"h":32}};
 const PROP_M = {"hut":{"x":0,"w":43,"h":44},"house":{"x":45,"w":66,"h":60},"tower":{"x":113,"w":102,"h":280},"temple":{"x":217,"w":65,"h":80},"granary":{"x":284,"w":47,"h":56},"catapult":{"x":333,"w":60,"h":48},"horse":{"x":395,"w":56,"h":48},"sign":{"x":453,"w":39,"h":48}};
 const PROP_H = Math.max(...Object.values(PROP_M).map(v => v.h));
@@ -1451,7 +1452,9 @@ function heroFrame() {
   if (P.hurtT > 0) return 'hurt';
   if (P.shootT > 0) return ranged() === 'bow' ? 'spearready' : 'shove';
   if (P.atk > 0) {
-    if (wpn === 'club' && heroKey() === 'hero') return P.atk > 10 ? 'clubwind' : P.atk > 3 ? 'attack' : 'shove'; // wind up, smash into the ground, follow through
+    const wide = ATLAS[heroKey()].cw === 64; // the redrawn sheets have their own wind-up and strike frames
+    if (wpn === 'sword' && wide) return P.atk > 10 ? 'clubwind' : 'attack';
+    if (wpn === 'club' && wide) return P.atk > 10 ? 'clubwind' : P.atk > 3 ? 'attack' : 'shove'; // wind up, smash into the ground, follow through
     if (wpn === 'club' || wpn === 'pick') return P.atk > 11 ? 'clubwind' : 'shove'; // wind up, then the arm swings forward with the club drawn over it
     if (wpn === 'sword') return 'shove';
     return P.atk > 11 ? 'shove' : P.atk > 3 ? 'spearthrust' : 'spearready';
@@ -1630,7 +1633,7 @@ function drawPlayer() {
     ctx.save(); ctx.translate(x + P.face * 3, y - 15.5); ctx.scale(P.face, 1); ctx.rotate(-1.7 + ease * 2.3);
     drawPickaxe(); ctx.restore();
   }
-  if (wpnNow() === 'club' && heroKey() !== 'hero' && P.atk > 0 && P.atk <= 11) {
+  if (wpnNow() === 'club' && ATLAS[heroKey()].cw !== 64 && P.atk > 0 && P.atk <= 11) {
     const k = Math.min(1, (11 - P.atk) / 4), ease = 1 - (1 - k) * (1 - k);
     const ang = -1.7 + ease * 2.1;
     ctx.save(); ctx.translate(x + P.face * 3, y - 15.5); ctx.scale(P.face, 1); ctx.rotate(ang);
@@ -1641,7 +1644,7 @@ function drawPlayer() {
     ctx.restore();
   }
   // sword blade (Iron Working) during a swing
-  if (wpnNow() === 'sword' && P.atk > 3 && P.atk < 12) {
+  if (wpnNow() === 'sword' && ATLAS[heroKey()].cw !== 64 && P.atk > 3 && P.atk < 12) {
     ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(P.face, 1);
     px(6, -17, 3, 3, '#6b4426'); px(9, -16.5, 13, 2, '#d7dde2'); px(9, -16.5, 13, 1, '#ffffff'); px(8, -19, 1, 7, '#b98a24');
     ctx.restore();
