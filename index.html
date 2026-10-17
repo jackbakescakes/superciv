@@ -126,7 +126,7 @@ details.tools button { font-size: .85rem; padding: 4px 10px; }
   <div class="keys">
     <span><kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> walk; keep going to break into a run, then a sprint</span>
     <span><kbd>Space</kbd> / <kbd>↑</kbd> / <kbd>W</kbd> jump (hold for higher; faster runs jump higher; three in a row flips) · <kbd>Shift</kbd> / <kbd>X</kbd> spin jump, or hop off your horse</span>
-    <span><kbd>Left click</kbd> use what is picked in your hotbar · <kbd>Mouse wheel</kbd> or <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> pick your weapon, bow or pickaxe. The pickaxe mines gold rocks in three hits; six stomps work too.</span>
+    <span><kbd>Left click</kbd> use what is picked in your hotbar · <kbd>Mouse wheel</kbd> or <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> pick your weapon, bow or pickaxe. The pickaxe mines gold rocks in three hits; eight stomps work too.</span>
     <span><kbd>↓</kbd> drop through tree tops</span>
   </div>
 </div>
@@ -169,7 +169,7 @@ const FOES = {
 // ---- player weapons: left click swings, right click fires ----
 const PICK = { name: 'Pickaxe', reach: 15, h: 13, dmg: 1, cd: 18 };
 const MELEE = {
-  club:  { name: 'Club',  reach: 16, h: 13, dmg: 1, cd: 30 },
+  club:  { name: 'Club',  reach: 22, h: 13, dmg: 1, cd: 30 },
   spear: { name: 'Spear', reach: 26, h: 7,  dmg: 2, cd: 22 },
   sword: { name: 'Sword', reach: 22, h: 10, dmg: 3, cd: 16 },
 };
@@ -303,7 +303,8 @@ const WONDERS = [
 ];
 const wonder = id => !!(prog.wonders && prog.wonders[id]);
 const wonderCost = w => { const m = 1 + w.era * .8; return { food: Math.round(25 * m), gold: Math.round(25 * m), sci: Math.round(20 * m), cul: Math.round(15 * m) }; };
-const advCost = a => a.id === 'spaceflight' && wonder('apollo') ? Math.round(a.cost / 2) : a.cost;
+const RESEARCH_MULT = 1.5; // research costs half as much again as the listed base cost
+const advCost = a => Math.round(a.cost * RESEARCH_MULT / (a.id === 'spaceflight' && wonder('apollo') ? 2 : 1));
 const oreGold = o => wonder('smith') ? Math.ceil(o.v * 1.5) : o.v;
 const shieldSci = s => s.v + (wonder('greatlib') ? 1 : 0);
 // culture pushes your borders out: you start with the six farm tiles, the outer ring is bought tile by tile
@@ -378,7 +379,7 @@ function buildLevel() {
     tree: (x0, x1, row) => { L.plat(x0, x1, row); trees.push({ x0, x1, row }); },
     line: (x0, x1, row, step = 1, v = 1) => { for (let x = x0; x <= x1; x += step) apples.push({ x: x * TS + 8, y: row * TS + 8, v, got: false }); },
     onGround: (x0, x1, step = 2, v = 1) => { for (let x = x0; x <= x1; x += step) { const gy = groundTop(x); if (gy < LH) apples.push({ x: x * TS + 8, y: (gy - 1) * TS + 8, v, got: false }); } },
-    ore: (x, v) => { const gy = groundTop(x); if (gy < LH) ores.push({ x: x * TS + 8, y: gy * TS, hp: 6, v, flash: 0 }); },
+    ore: (x, v) => { const gy = groundTop(x); if (gy < LH) ores.push({ x: x * TS + 8, y: gy * TS, hp: 8, v, flash: 0 }); },
     sh: (x, row, v = 1) => shields.push({ x: x * TS + 8, y: row * TS + 8, v, got: false }),
   };
   LAYOUTS[prog.era](L);
@@ -725,9 +726,9 @@ function updatePlayer() {
   if (P.atk > 3 && P.atk < 11) {
     const hb = { x: P.face > 0 ? P.x + P.w : P.x - W.reach, y: P.y + P.h - (W.h > 10 ? 15 : 12) - (P.mounted ? 10 : 0), w: W.reach, h: W.h };
     for (const b of barbs) if (b.lastSwing !== P.swing && overlap(hb, b)) { b.lastSwing = P.swing; hurtBarb(b, meleeDmg(), P.face); }
-    // only the pickaxe mines: two points a whack, so a rock takes three
+    // only the pickaxe mines: three points a whack, so a rock takes three whacks (or eight stomps)
     if (P.tool === 'pick') for (const o of ores) if (o.hp > 0 && o.lastSwing !== P.swing && hb.x < o.x + 9 && hb.x + hb.w > o.x - 9 && hb.y < o.y && hb.y + hb.h > o.y - 15) {
-      o.lastSwing = P.swing; o.hp -= 2; o.flash = 8; burst(o.x, o.y - 8, '#c9c2b6', 4);
+      o.lastSwing = P.swing; o.hp -= 3; o.flash = 8; burst(o.x, o.y - 8, '#c9c2b6', 4);
       if (o.hp <= 0) { run.gold += oreGold(o); addText(o.x, o.y - 18, `+${oreGold(o)} gold`, '#ffd23f'); burst(o.x, o.y - 8, '#ffd23f', 10); }
     }
   }
@@ -779,7 +780,7 @@ function updatePlayer() {
   // Mario-style rock smash: land on top of a gold rock (on foot or riding) to crack it
   if (P.vy > 0) for (const o of ores) {
     if (o.hp <= 0 || Math.abs(o.x - (P.x + P.w / 2)) > P.w / 2 + 6 || P.prevBottom > o.y - 9 || P.y + P.h < o.y - 11) continue;
-    o.hp -= 1; // six stomps crack a rock o.flash = 8; burst(o.x, o.y - 8, '#c9c2b6', 5); puff(o.x, o.y - 10, 0, 3);
+    o.hp -= 1; o.flash = 8; burst(o.x, o.y - 8, '#c9c2b6', 5); puff(o.x, o.y - 10, 0, 3); // eight stomps crack a rock
     P.y = o.y - 11 - P.h; P.vy = keys.jump || keys.spin ? -5.5 : -3.6; P.sq = .25; P.fluttered = false;
     if (o.hp <= 0) { run.gold += oreGold(o); addText(o.x, o.y - 18, `+${oreGold(o)} gold`, '#ffd23f'); burst(o.x, o.y - 8, '#ffd23f', 10); }
     break;
@@ -1425,8 +1426,8 @@ function drawOre(o) {
   px(x - 7, y - 4, 14, 4, c[0]); px(x - 6, y - 8, 12, 4, c[0]); px(x - 4, y - 11, 8, 3, c[0]);
   px(x - 6, y - 8, 4, 2, c[1]); px(x - 4, y - 11, 3, 1, c[1]); px(x + 1, y - 6, 5, 2, c[1]);
   px(x - 5, y - 4, 2, 2, c[2]); px(x + 2, y - 8, 2, 2, c[2]); px(x - 1, y - 6, 2, 2, c[2]); px(x + 4, y - 3, 2, 2, c[2]);
-  if (o.hp < 3) { px(x - 1, y - 11, 1, 5, '#2a2833'); px(x, y - 7, 2, 1, '#2a2833'); }
-  if (o.hp < 2) { px(x + 3, y - 9, 1, 5, '#2a2833'); px(x + 2, y - 5, 3, 1, '#2a2833'); }
+  if (o.hp < 6) { px(x - 1, y - 11, 1, 5, '#2a2833'); px(x, y - 7, 2, 1, '#2a2833'); }
+  if (o.hp < 3) { px(x + 3, y - 9, 1, 5, '#2a2833'); px(x + 2, y - 5, 3, 1, '#2a2833'); }
   if (frame % 90 < 6) px(x + 3, y - 12, 2, 2, '#fff');
 }
 function drawShield(x, y, big) {
@@ -1647,7 +1648,7 @@ function drawPlayer() {
   }
   // swing swoosh
   if (P.atk > 3 && P.atk < 11) {
-    const wpn = wpnNow(), reach = wpn === 'spear' ? 30 : wpn === 'sword' ? 26 : 20, k = (11 - P.atk) / 8;
+    const wpn = wpnNow(), reach = wpn === 'spear' ? 30 : wpn === 'sword' ? 26 : 25, k = (11 - P.atk) / 8;
     ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(P.face, 1);
     ctx.globalAlpha = .55 * (1 - k); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
     ctx.beginPath(); if (wpn !== 'spear') ctx.arc(2, -14, reach * (.7 + k * .3), -1.1, .9); else { ctx.moveTo(10, -14); ctx.lineTo(10 + reach * (.6 + k * .4), -14); }

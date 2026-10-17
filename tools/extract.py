@@ -21,6 +21,11 @@ def extract(path, maxy=None, min_area=1500):
     if maxy: a = a[:maxy]
     bg = key_magenta(a)
     fg = ~bg
+    # drop long thin horizontal lines (a ground line Gemini sometimes draws)
+    for y in range(fg.shape[0]):
+        if fg[y].mean() > 0.5:
+            above = fg[max(0, y - 4)].mean(); below = fg[min(fg.shape[0] - 1, y + 4)].mean()
+            if min(above, below) < 0.35: fg[y] = False
     # drop thin stray lines (grid lines / wall line): open slightly
     lab, n = ndimage.label(ndimage.binary_dilation(fg, iterations=3))
     out = []
